@@ -1,0 +1,282 @@
+def simulate(Instruction,InstructionHex,debugMode):
+    print("***Starting simulation***")
+    print("Settings:")
+    Register = [0,0,0,0,0,0,0,0]    # initialize all values in registers to 0
+    Memory = [0 for i in range(mem_space)] 
+    PC = 0
+    DIC = 0
+    Cycle = 1
+    threeCycles = 0 # frequency of how many instruction takes 3 cycles
+    fourCycles = 0  #                                         4 cycles
+    fiveCycles = 0  #                                         5 cycles
+
+    finished = False
+    while(not(finished)):
+    
+        DIC += 1
+        fetch = Instruction[PC]
+        if (fetch[0:32] == '00010000000000001111111111111111'):
+            print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " : Deadloop. Ending program")
+            finished = True
+
+        elif (fetch[0:6] == '000000' and fetch[26:32] == '100000'): # ADD
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "add $" + str(int(fetch[16:21],2)) + ",$" +str(int(fetch[6:11],2)) + ",$" + str(int(fetch[11:16],2)) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(fetch[16:21],2)] = Register[int(fetch[6:11],2)] + Register[int(fetch[11:16],2)]
+           
+
+        elif(fetch[0:6] == '001000'):                               # ADDI
+            imm = int(fetch[16:32],2) if fetch[16]=='0' else -(65535 -int(fetch[16:32],2)+1)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "addi $" + str(int(fetch[16:21],2)) + ",$" +str(int(fetch[6:11],2)) + ",$" + str(imm) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(fetch[11:16],2)] = Register[int(fetch[6:11],2)] + imm
+
+        elif (fetch[0:6] == '000000' and fetch[26:32] == '100010'): # SUB
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "add $" + str(int(fetch[16:21],2)) + ",$" +str(int(fetch[6:11],2)) + ",$" + str(int(fetch[11:16],2)) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(fetch[16:21],2)] = Register[int(fetch[6:11],2)] - Register[int(fetch[11:16],2)]
+
+        elif(fetch[0:6] == '000100'):                               # BEQ
+            imm = int(fetch[16:32],2) if fetch[16]=='0' else -(65535 -int(fetch[16:32],2)+1)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "beq $" + str(int(fetch[6:11],2)) + ",$" +str(int(fetch[11:16],2)) + "," + str(imm) )
+                print("Taking 3 cycles \n")
+            Cycle += 3
+            PC += 1
+            threeCycles += 1
+            PC = PC + imm if (Register[int(fetch[6:11],2)] == Register[int(fetch[11:16],2)]) else PC
+
+        elif(fetch[0:6] == '000101'):                               # BNE
+            imm = int(fetch[16:32],2) if fetch[16]=='0' else -(65535 -int(fetch[16:32],2)+1)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "bne $" + str(int(fetch[6:11],2)) + ",$" +str(int(fetch[11:16],2)) + "," + str(imm) )
+                print("Taking 3 cycles \n")
+            Cycle += 3
+            PC += 1
+            threeCycles += 1
+            PC = PC + imm if (Register[int(fetch[6:11],2)] != Register[int(fetch[11:16],2)]) else PC
+
+        elif(fetch[0:6] == '000000' and fetch[26:32] == '101010'): # SLT
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "slt $" + str(int(fetch[16:21],2)) + ",$" +str(int(fetch[6:11],2)) + ",$" + str(int(fetch[11:16],2)) )
+                print("Taking 4 cycles \n")
+            Cycle += 4
+            PC += 1
+            fourCycles += 1
+            Register[int(fetch[16:21],2)] = 1 if Register[int(fetch[6:11],2)] < Register[int(fetch[11:16],2)] else 0
+
+        elif (fetch[0:6] == '000000' and fetch[26:32] == '100011'): # XOR
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "xor $" + str(int(fetch[16:21],2)) + ",$" +str(int(fetch[6:11],2)) + ",$" + str(int(fetch[11:16],2)) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(fetch[16:21],2)] = Register[int(fetch[6:11],2)] ^ Register[int(fetch[11:16],2)]
+
+
+        elif(fetch[0:6] == '101011'):                               # SW
+            #Sanity check for word-addressing 
+            if ( int(fetch[30:32])%4 != 0 ):
+                print("Runtime exception: fetch address not aligned on word boundary. Exiting ")
+                print("Instruction causing error:", hex(int(fetch,2)))
+                exit()
+            imm = int(fetch[16:32],2)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "sw $" + str(int(fetch[6:11],2)) + "," +str(imm + Register[int(fetch[6:11],2)] - 8192) + "(0x2000)" )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Memory[imm + Register[int(fetch[6:11],2)] - 8192]= Register[int(fetch[11:16],2)] # Store word into memory
+
+        elif(fetch[0:6] == '100011'):                               # LW
+            #Sanity check for word-addressing 
+            if ( int(fetch[30:32])%4 != 0 ):
+                print("Runtime exception: fetch address not aligned on word boundary. Exiting ")
+                print("Instruction causing error:", hex(int(fetch,2)))
+                exit()
+            imm = int(fetch[16:32],2)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "lw $" + str(int(fetch[6:11],2)) + "," +str(imm + Register[int(fetch[6:11],2)] - 8192) + "(0x2000)" )
+                print("Taking 5 cycles \n")
+            PC += 1
+            Cycle += 5
+            fiveCycles += 1
+            Register[int(fetch[11:16],2)] = Memory[imm + Register[int(fetch[6:11],2)] - 8192] # Load memory into register
+ 
+    print("***Finished simulation***")
+    print("Total # of cycles: " + str(Cycle))
+    print("Dynamic instructions count: " +str(DIC) + ". Break down:")
+    print("                    " + str(threeCycles) + " instructions take 3 cycles" )
+    print("                    " + str(fourCycles) + " instructions take 4 cycles" )
+    print("                    " + str(fiveCycles) + " instructions take 5 cycles" )
+    print("Registers: " + str(Register))
+     
+   
+
+
+def main():
+    print("Choose the mode of running test.txt: ")
+    debugMode =True if  int(input("1 = debug mode         2 = normal execution\n"))== 1 else False
+
+    I_file = open("test.txt","r")
+    Instruction = []            # array containing all instructions to execute         
+    InstructionHex = []
+    for line in I_file:
+        if (line == "\n" or line[0] =='#'):              # empty lines,comments ignored
+            continue
+        line = line.replace('\n','')
+        InstructionHex.append(line)
+        line = format(int(line,16),"032b")
+        Instruction.append(line)
+        
+    
+    simulate(Instruction,InstructionHex,debugMode)
+
+
+
+if __name__ == "__main__":
+    main()
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+#trying to fix to read in hex
+finished = False
+    while(not(finished)):
+    
+        DIC += 1
+        fetch = Instruction[PC]
+        
+        binary = int(fetch[0,7],16)
+
+        if (binary[0:32] == '00010000000000001111111111111111'):
+            print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " : Deadloop. Ending program")
+            finished = True
+
+        elif (binary[0:6] == '000000' and binary[26:32] == '100000'): # ADD
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "add $" + str(int(binary[16:21],2)) + ",$" +str(int(binary[6:11],2)) + ",$" + str(int(binary[11:16],2)) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(binary[16:21],2)] = Register[int(binary[6:11],2)] + Register[int(binary[11:16],2)]
+           
+
+        elif(binary[0:6] == '001000'):                               # ADDI
+            imm = int(binary[16:32],2) if binary[16]=='0' else -(65535 -int(binary[16:32],2)+1)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "addi $" + str(int(binary[16:21],2)) + ",$" +str(int(binary[6:11],2)) + ",$" + str(imm) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(binary[11:16],2)] = Register[int(binary[6:11],2)] + imm
+
+        elif (binary[0:6] == '000000' and binary[26:32] == '100010'): # SUB
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "add $" + str(int(binary[16:21],2)) + ",$" +str(int(binary[6:11],2)) + ",$" + str(int(binary[11:16],2)) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(binary[16:21],2)] = Register[int(binary[6:11],2)] - Register[int(binary[11:16],2)]
+
+        elif(binary[0:6] == '000100'):                               # BEQ
+            imm = int(binary[16:32],2) if binary[16]=='0' else -(65535 -int(binary[16:32],2)+1)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "beq $" + str(int(binary[6:11],2)) + ",$" +str(int(binary[11:16],2)) + "," + str(imm) )
+                print("Taking 3 cycles \n")
+            Cycle += 3
+            PC += 1
+            threeCycles += 1
+            PC = PC + imm if (Register[int(binary[6:11],2)] == Register[int(binary[11:16],2)]) else PC
+
+        elif(binary[0:6] == '000101'):                               # BNE
+            imm = int(binary[16:32],2) if binary[16]=='0' else -(65535 -int(binary[16:32],2)+1)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "bne $" + str(int(binary[6:11],2)) + ",$" +str(int(binary[11:16],2)) + "," + str(imm) )
+                print("Taking 3 cycles \n")
+            Cycle += 3
+            PC += 1
+            threeCycles += 1
+            PC = PC + imm if (Register[int(binary[6:11],2)] != Register[int(binary[11:16],2)]) else PC
+
+        elif(binary[0:6] == '000000' and binary[26:32] == '101010'): # SLT
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "slt $" + str(int(binary[16:21],2)) + ",$" +str(int(binary[6:11],2)) + ",$" + str(int(binary[11:16],2)) )
+                print("Taking 4 cycles \n")
+            Cycle += 4
+            PC += 1
+            fourCycles += 1
+            Register[int(binary[16:21],2)] = 1 if Register[int(binary[6:11],2)] < Register[int(binary[11:16],2)] else 0
+
+        elif (binary[0:6] == '000000' and binary[26:32] == '100011'): # XOR
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "xor $" + str(int(binary[16:21],2)) + ",$" +str(int(binary[6:11],2)) + ",$" + str(int(binary[11:16],2)) )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Register[int(binary[16:21],2)] = Register[int(binary[6:11],2)] ^ Register[int(binary[11:16],2)]
+
+
+        elif(binary[0:6] == '101011'):                               # SW
+            #Sanity check for word-addressing 
+            if ( int(binary[30:32])%4 != 0 ):
+                print("Runtime exception: binary address not aligned on word boundary. Exiting ")
+                print("Instruction causing error:", hex(int(binary,2)))
+                exit()
+            imm = int(binary[16:32],2)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "sw $" + str(int(binary[6:11],2)) + "," +str(imm + Register[int(binary[6:11],2)] - 8192) + "(0x2000)" )
+                print("Taking 4 cycles \n")
+            PC += 1
+            Cycle += 4
+            fourCycles += 1
+            Memory[imm + Register[int(binary[6:11],2)] - 8192]= Register[int(binary[11:16],2)] # Store word into memory
+
+        elif(binary[0:6] == '100011'):                               # LW
+            #Sanity check for word-addressing 
+            if ( int(binary[30:32])%4 != 0 ):
+                print("Runtime exception: binary address not aligned on word boundary. Exiting ")
+                print("Instruction causing error:", hex(int(binary,2)))
+                exit()
+            imm = int(binary[16:32],2)
+            if(debugMode):
+                print("Cycles " + str(Cycle) + ":")
+                print("PC =" + str(PC*4) + " Instruction: 0x" +  InstructionHex[PC] + " :" + "lw $" + str(int(binary[6:11],2)) + "," +str(imm + Register[int(binary[6:11],2)] - 8192) + "(0x2000)" )
+                print("Taking 5 cycles \n")
+            PC += 1
+            Cycle += 5
+            fiveCycles += 1
+            Register[int(binary[11:16],2)] = Memory[imm + Register[int(binary[6:11],2)] - 8192] # Load memory into register
